@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TrackDao {
-    @Query("SELECT * FROM tracks ORDER BY album ASC, disc_number ASC, track_number ASC")
+    @Query("SELECT `rowid`, * FROM tracks ORDER BY album ASC, disc_number ASC, track_number ASC")
     fun observeAllTracks(): Flow<List<TrackEntity>>
 
     @Query("""
@@ -24,7 +24,7 @@ interface TrackDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertTracks(tracks: List<TrackEntity>)
 
-    @Query("SELECT * FROM tracks WHERE id = :trackId LIMIT 1")
+    @Query("SELECT `rowid`, * FROM tracks WHERE `rowid` = :trackId LIMIT 1")
     suspend fun getTrackById(trackId: Long): TrackEntity?
 }
 

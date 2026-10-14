@@ -8,7 +8,7 @@ import android.hardware.SensorManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
@@ -89,7 +89,7 @@ class GyroSpecularSensorManager @Inject constructor(
 
 @Composable
 fun rememberGyroLightDirection(sensorManager: GyroSpecularSensorManager): State<Offset> {
-    val state = remember { mutableStateOf(sensorManager.lightDirection.value) }
+    val state = sensorManager.lightDirection.collectAsState()
     DisposableEffect(sensorManager) {
         sensorManager.startListening()
         onDispose {

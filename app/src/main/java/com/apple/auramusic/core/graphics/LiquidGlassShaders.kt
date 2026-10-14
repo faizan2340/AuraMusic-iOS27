@@ -1,10 +1,8 @@
 package com.apple.auramusic.core.graphics
 
-import org.intellij.lang.annotations.Language
 
 object LiquidGlassShaders {
 
-    @Language("AGSL")
     const val LIQUID_GLASS_AGSL = """
         uniform shader uContent;
         uniform float2 uResolution;
@@ -116,7 +114,6 @@ object LiquidGlassShaders {
         }
     """
 
-    @Language("AGSL")
     const val METABALL_GLASS_CONTAINER_AGSL = """
         uniform shader uContent;
         uniform float2 uResolution;
@@ -190,7 +187,6 @@ object LiquidGlassShaders {
         }
     """
 
-    @Language("AGSL")
     const val LIVING_MESH_GRADIENT_AGSL = """
         uniform float2 uResolution;
         uniform float uTime;

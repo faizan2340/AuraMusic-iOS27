@@ -103,7 +103,7 @@ fun NowPlayingSheet(
     var showSyncedLyrics by remember { mutableStateOf(false) }
 
     // Interpolate sheet corner radius from 26dp (Mini-Player capsule) to hardware bezel radius
-    val currentCornerRadius = 26.dp + (bezelRadius - 26.dp) * expansionFraction.value
+    val currentCornerRadius = (26f + (bezelRadius.value - 26f) * expansionFraction.value).dp
     val sheetShape = ContinuousRoundedCornerShape(currentCornerRadius)
 
     // Breathing Artwork Container: 1.0f playing with deep multi-colored shadow; 0.82f paused

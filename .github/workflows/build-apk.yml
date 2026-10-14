@@ -5,6 +5,9 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -18,22 +21,22 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Configure Pre-Installed Android SDK & Build APK
+        run: |
+          set -euo pipefail
+          sed -i '/aapt2FromMavenOverride/d' gradle.properties || true
+          echo "android.suppressUnsupportedCompileSdk=35,36" >> gradle.properties
 
-      - name: Accept Android SDK Licenses
-        run: yes | sdkmanager --licenses || true
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          SDKMANAGER=$(find "$ANDROID_HOME" -name sdkmanager | head -n 1)
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+          sed -i 's/compileSdk = 36/compileSdk = 35/g; s/targetSdk = 36/targetSdk = 35/g' app/build.gradle.kts
 
-      - name: Install Android SDK 36 Platform & Build-Tools
-        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
-
-      - name: Build Debug APK
-        run: gradle assembleDebug --stacktrace
+          curl -sL https://services.gradle.org/distributions/gradle-8.10.2-bin.zip -o /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+          /tmp/gradle-8.10.2/bin/gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload Compiled APK Artifact
         uses: actions/upload-artifact@v4
