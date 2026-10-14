@@ -202,6 +202,7 @@ class MusicViewModel(
                     }
                 }
             })
+        }, context.mainExecutor)
     }
 
     private fun startPositionTicker() {
