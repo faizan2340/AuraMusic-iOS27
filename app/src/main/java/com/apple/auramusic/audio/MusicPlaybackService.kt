@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
-import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
@@ -51,19 +50,6 @@ class MusicPlaybackService : MediaLibraryService() {
             .setHandleAudioBecomingNoisy(true)
             .setPauseAtEndOfMediaItems(false)
             .build()
-            .apply {
-                trackSelectionParameters = trackSelectionParameters
-                    .buildUpon()
-                    .setAudioOffloadPreferences(
-                        TrackSelectionParameters.AudioOffloadPreferences.Builder()
-                            .setAudioOffloadMode(
-                                TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
-                            )
-                            .setIsGaplessSupportRequired(true)
-                            .build()
-                    )
-                    .build()
-            }
 
         val sessionActivityIntent = PendingIntent.getActivity(
             this,

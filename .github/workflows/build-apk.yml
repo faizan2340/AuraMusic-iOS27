@@ -31,7 +31,12 @@ jobs:
 
           curl -sL https://services.gradle.org/distributions/gradle-8.10.2-bin.zip -o /tmp/gradle.zip
           unzip -q -o /tmp/gradle.zip -d /tmp
-          /tmp/gradle-8.10.2/bin/gradle assembleDebug --no-daemon --stacktrace
+          if ! /tmp/gradle-8.10.2/bin/gradle assembleDebug --no-daemon > /tmp/gradle_build.log 2>&1; then
+            echo "========== GRADLE FAILURE SUMMARY =========="
+            grep -E "e: |What went wrong|Execution failed|Caused by:|> |FAILURE:" -A 6 /tmp/gradle_build.log || tail -n 80 /tmp/gradle_build.log
+            exit 1
+          fi
+          tail -n 25 /tmp/gradle_build.log
 
       - name: Upload Compiled APK Artifact
         uses: actions/upload-artifact@v4

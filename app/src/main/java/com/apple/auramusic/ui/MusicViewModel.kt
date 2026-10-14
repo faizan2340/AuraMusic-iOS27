@@ -21,7 +21,6 @@ import com.apple.auramusic.data.local.TrackEntity
 import com.apple.auramusic.data.lyrics.SyncedLyricLine
 import com.apple.auramusic.data.lyrics.SyncedLyricsParser
 import com.apple.auramusic.di.AppContainer
-import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -203,7 +202,6 @@ class MusicViewModel(
                     }
                 }
             })
-        }, MoreExecutors.directExecutor())
     }
 
     private fun startPositionTicker() {
