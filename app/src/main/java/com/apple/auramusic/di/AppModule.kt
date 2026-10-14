@@ -1,29 +1,19 @@
 package com.apple.auramusic.di
 
 import android.content.Context
-import androidx.room.Room
-import com.apple.auramusic.data.local.MusicDatabase
+import com.apple.auramusic.audio.BassAmplitudeBufferSink
+import com.apple.auramusic.core.graphics.GyroSpecularSensorManager
+import com.apple.auramusic.core.physics.IosHapticsController
+import com.apple.auramusic.data.indexer.LocalAudioIndexer
 import com.apple.auramusic.data.local.TrackDao
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
-import javax.inject.Singleton
+import com.apple.auramusic.data.lyrics.SyncedLyricsParser
 
-@Module
-@InstallIn(SingletonComponent::class)
-object AppModule {
-
-    @Provides
-    @Singleton
-    fun provideMusicDatabase(@ApplicationContext context: Context): MusicDatabase =
-        Room.databaseBuilder(
-            context,
-            MusicDatabase::class.java,
-            "aura_music_ios27.db"
-        ).fallbackToDestructiveMigration().build()
-
-    @Provides
-    fun provideTrackDao(db: MusicDatabase): TrackDao = db.trackDao()
+class AppContainer(context: Context) {
+    val appContext: Context = context.applicationContext
+    val trackDao = TrackDao(appContext)
+    val localAudioIndexer = LocalAudioIndexer(appContext, trackDao)
+    val lyricsParser = SyncedLyricsParser()
+    val gyroSensorManager = GyroSpecularSensorManager(appContext)
+    val hapticsController = IosHapticsController(appContext)
+    val bassBufferSink = BassAmplitudeBufferSink()
 }

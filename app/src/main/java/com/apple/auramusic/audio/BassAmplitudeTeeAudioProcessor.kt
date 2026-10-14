@@ -7,14 +7,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-@Singleton
-class BassAmplitudeBufferSink @Inject constructor() : TeeAudioProcessor.AudioBufferSink {
+class BassAmplitudeBufferSink constructor() : TeeAudioProcessor.AudioBufferSink {
 
     private var sampleRateHz: Int = 48000
     private var channelCount: Int = 2

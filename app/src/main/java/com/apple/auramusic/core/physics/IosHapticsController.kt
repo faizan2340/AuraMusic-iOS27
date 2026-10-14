@@ -4,14 +4,10 @@ import android.content.Context
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.floor
 
-@Singleton
-class IosHapticsController @Inject constructor(
-    @ApplicationContext context: Context
+class IosHapticsController constructor(
+    context: Context
 ) {
     private val vibrator: Vibrator =
         (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator

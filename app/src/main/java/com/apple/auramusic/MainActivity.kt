@@ -2,7 +2,11 @@ package com.apple.auramusic
 
 import android.app.Application
 import android.os.Build
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -46,7 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import com.apple.auramusic.core.design.HardwareArtworkImage
 import com.apple.auramusic.core.design.ContinuousRoundedCornerShape
 import com.apple.auramusic.core.design.IosTypography
 import com.apple.auramusic.core.design.iosPressEffect
@@ -60,22 +64,47 @@ import com.apple.auramusic.ui.navigation.IosMusicTab
 import com.apple.auramusic.ui.nowplaying.NowPlayingSheet
 import com.apple.auramusic.ui.nowplaying.formatTabularTimestamp
 import com.apple.auramusic.ui.settings.LiquidGlassSpectrumSheet
-import dagger.hilt.android.AndroidEntryPoint
-import dagger.hilt.android.HiltAndroidApp
+import com.apple.auramusic.di.AppContainer
 import kotlinx.coroutines.launch
 
-@HiltAndroidApp
-class AuraMusicApp : Application()
+class AuraMusicApp : Application() {
+    lateinit var container: AppContainer
+        private set
 
-@AndroidEntryPoint
+    override fun onCreate() {
+        super.onCreate()
+        container = AppContainer(this)
+    }
+}
+
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MusicViewModel by viewModels()
+    private val viewModel: MusicViewModel by viewModels {
+        MusicViewModel.provideFactory((application as AuraMusicApp).container)
+    }
+
+    private val audioPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.refreshLocalLibrary()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         lock120HzProMotionDisplayRate()
+
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_MEDIA_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            audioPermissionLauncher.launch(Manifest.permission.READ_MEDIA_AUDIO)
+        } else {
+            viewModel.refreshLocalLibrary()
+        }
 
         setContent {
             AuraMusicRootScreen(viewModel = viewModel)
@@ -91,8 +120,7 @@ class MainActivity : ComponentActivity() {
         val highestRateMode = modes.maxByOrNull { it.refreshRate } ?: return
         window.attributes = window.attributes.apply {
             preferredDisplayModeId = highestRateMode.modeId
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            }
+
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
@@ -211,8 +239,8 @@ fun AuraMusicRootScreen(viewModel: MusicViewModel) {
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        AsyncImage(
-                            model = track.artworkUri,
+                        HardwareArtworkImage(
+                            artworkUri = track.artworkUri,
                             contentDescription = track.album,
                             modifier = Modifier
                                 .size(52.dp)

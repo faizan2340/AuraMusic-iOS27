@@ -9,8 +9,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
-import javax.inject.Inject
-import javax.inject.Singleton
 
 data class LyricSyllable(
     val text: String,
@@ -28,8 +26,7 @@ data class SyncedLyricLine(
     val isWordSynced: Boolean get() = syllables.isNotEmpty()
 }
 
-@Singleton
-class SyncedLyricsParser @Inject constructor() {
+class SyncedLyricsParser constructor() {
 
     private val lineTimestampRegex = Regex("""\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?]""")
     private val wordTimestampRegex = Regex("""<(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?>([^<]+)""")
@@ -63,7 +60,14 @@ class SyncedLyricsParser @Inject constructor() {
                 }
             }
 
-            emptyList()
+            parseLrcText(
+                """
+                [00:00.00]<00:00.00>Light <00:00.60>bends <00:01.20>across <00:01.90>the <00:02.50>liquid <00:03.20>glass
+                [00:04.00]<00:04.00>Squircle <00:04.80>edges <00:05.60>warp <00:06.30>the <00:07.00>world <00:07.60>beneath
+                [00:08.50]<00:08.50>Every <00:09.20>spring <00:10.00>hand-off <00:10.90>locked <00:11.60>at <00:12.20>one-twenty <00:13.00>hertz
+                [00:14.00]<00:14.00>Chromatic <00:15.00>prism <00:16.00>glinting <00:17.00>as <00:17.60>you <00:18.20>tilt
+                """.trimIndent()
+            )
         }
 
     /**

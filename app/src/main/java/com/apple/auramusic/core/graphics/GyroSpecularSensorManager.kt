@@ -12,19 +12,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-@Singleton
-class GyroSpecularSensorManager @Inject constructor(
-    @ApplicationContext context: Context
+class GyroSpecularSensorManager constructor(
+    context: Context
 ) : SensorEventListener {
 
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager

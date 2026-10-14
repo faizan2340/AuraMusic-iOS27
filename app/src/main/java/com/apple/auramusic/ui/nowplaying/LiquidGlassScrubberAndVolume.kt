@@ -127,7 +127,7 @@ fun LiquidGlassExpandableBar(
                 },
             contentAlignment = Alignment.Center
         ) {
-            val shape = ContinuousRoundedCornerShape(trackHeight / 2)
+            val shape = ContinuousRoundedCornerShape((trackHeight.value * 0.5f).dp)
             val rubberStretch = iosRubberBandTransform(
                 overscrollDistance = overscrollStretchPx.value,
                 dimension = trackWidthPx,

@@ -25,8 +25,6 @@ jobs:
         run: |
           set -e
           sed -i '/aapt2FromMavenOverride/d' gradle.properties || true
-          echo "android.suppressUnsupportedCompileSdk=35,36" >> gradle.properties
-          sed -i 's/compileSdk = 36/compileSdk = 35/g; s/targetSdk = 36/targetSdk = 35/g' app/build.gradle.kts
 
           export ANDROID_HOME="/usr/local/lib/android/sdk"
           export ANDROID_SDK_ROOT="$ANDROID_HOME"

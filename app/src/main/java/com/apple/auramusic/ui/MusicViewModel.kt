@@ -3,6 +3,7 @@ package com.apple.auramusic.ui
 import android.content.ComponentName
 import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -19,9 +20,8 @@ import com.apple.auramusic.data.local.TrackDao
 import com.apple.auramusic.data.local.TrackEntity
 import com.apple.auramusic.data.lyrics.SyncedLyricLine
 import com.apple.auramusic.data.lyrics.SyncedLyricsParser
+import com.apple.auramusic.di.AppContainer
 import com.google.common.util.concurrent.MoreExecutors
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,11 +32,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class MusicViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+class MusicViewModel(
+    private val context: Context,
     private val trackDao: TrackDao,
     private val localAudioIndexer: LocalAudioIndexer,
     private val lyricsParser: SyncedLyricsParser,
@@ -56,8 +54,7 @@ class MusicViewModel @Inject constructor(
             if (query.isBlank()) {
                 trackDao.observeAllTracks()
             } else {
-                val sanitized = query.trim().split(Regex("\\s+")).joinToString(" ") { "$it*" }
-                trackDao.searchTracksInstant(sanitized)
+                trackDao.searchTracksInstant(query)
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -117,8 +114,16 @@ class MusicViewModel @Inject constructor(
         viewModelScope.launch {
             _syncedLyrics.value = lyricsParser.loadLyricsForTrack(track)
         }
-        val controller = mediaController ?: return
-        val items = queue.map { item ->
+        if (track.uri.isBlank()) {
+            _isPlaying.value = true
+            _currentPositionMs.value = 0L
+            return
+        }
+        val controller = mediaController ?: run {
+            _isPlaying.value = true
+            return
+        }
+        val items = queue.filter { it.uri.isNotBlank() }.map { item ->
             MediaItem.Builder()
                 .setMediaId(item.id.toString())
                 .setUri(item.uri)
@@ -138,7 +143,15 @@ class MusicViewModel @Inject constructor(
     }
 
     fun togglePlayPause() {
-        val controller = mediaController ?: return
+        val current = _currentTrack.value
+        if (current != null && current.uri.isBlank()) {
+            _isPlaying.value = !_isPlaying.value
+            return
+        }
+        val controller = mediaController ?: run {
+            _isPlaying.value = !_isPlaying.value
+            return
+        }
         if (controller.isPlaying) controller.pause() else controller.play()
     }
 
@@ -197,7 +210,10 @@ class MusicViewModel @Inject constructor(
         viewModelScope.launch {
             while (isActive) {
                 val controller = mediaController
-                if (controller != null && controller.isPlaying) {
+                val current = _currentTrack.value
+                if (current != null && current.uri.isBlank() && _isPlaying.value) {
+                    _currentPositionMs.value = (_currentPositionMs.value + 16L) % current.durationMs.coerceAtLeast(1L)
+                } else if (controller != null && controller.isPlaying) {
                     _currentPositionMs.value = controller.currentPosition
                 }
                 delay(16L)
@@ -208,5 +224,23 @@ class MusicViewModel @Inject constructor(
     override fun onCleared() {
         mediaController?.release()
         super.onCleared()
+    }
+
+    companion object {
+        fun provideFactory(container: AppContainer): ViewModelProvider.Factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return MusicViewModel(
+                        context = container.appContext,
+                        trackDao = container.trackDao,
+                        localAudioIndexer = container.localAudioIndexer,
+                        lyricsParser = container.lyricsParser,
+                        gyroSensorManager = container.gyroSensorManager,
+                        hapticsController = container.hapticsController,
+                        bassBufferSink = container.bassBufferSink
+                    ) as T
+                }
+            }
     }
 }

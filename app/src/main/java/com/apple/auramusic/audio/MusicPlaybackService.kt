@@ -5,28 +5,18 @@ import android.content.Context
 import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
-import androidx.media3.common.MediaItem
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.TeeAudioProcessor
-import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import com.apple.auramusic.AuraMusicApp
 import com.apple.auramusic.MainActivity
-import com.google.common.collect.ImmutableList
-import com.google.common.util.concurrent.Futures
-import com.google.common.util.concurrent.ListenableFuture
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 
-@AndroidEntryPoint
 class MusicPlaybackService : MediaLibraryService() {
-
-    @Inject
-    lateinit var bassBufferSink: BassAmplitudeBufferSink
 
     private val replayGainProcessor = ReplayGainAudioProcessor()
     private var mediaLibrarySession: MediaLibrarySession? = null
@@ -34,6 +24,7 @@ class MusicPlaybackService : MediaLibraryService() {
 
     override fun onCreate() {
         super.onCreate()
+        val bassBufferSink = (application as AuraMusicApp).container.bassBufferSink
 
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
@@ -48,7 +39,6 @@ class MusicPlaybackService : MediaLibraryService() {
             ): AudioSink {
                 val teeAudioProcessor = TeeAudioProcessor(bassBufferSink)
                 return DefaultAudioSink.Builder(context)
-                    // Direct 32-bit IEEE 754 PCM float output for 24-bit/96kHz+ lossless dynamic range
                     .setEnableFloatOutput(true)
                     .setEnableAudioTrackPlaybackParams(true)
                     .setAudioProcessors(arrayOf(replayGainProcessor, teeAudioProcessor))
@@ -59,7 +49,7 @@ class MusicPlaybackService : MediaLibraryService() {
         primaryExoPlayer = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
-            .setPauseAtEndOfMediaItems(false) // Enables gapless transitions
+            .setPauseAtEndOfMediaItems(false)
             .build()
             .apply {
                 trackSelectionParameters = trackSelectionParameters
@@ -85,7 +75,7 @@ class MusicPlaybackService : MediaLibraryService() {
         mediaLibrarySession = MediaLibrarySession.Builder(
             this,
             primaryExoPlayer,
-            LibrarySessionCallback()
+            object : MediaLibrarySession.Callback {}
         )
             .setSessionActivity(sessionActivityIntent)
             .build()
@@ -101,33 +91,5 @@ class MusicPlaybackService : MediaLibraryService() {
             mediaLibrarySession = null
         }
         super.onDestroy()
-    }
-
-    private inner class LibrarySessionCallback : MediaLibrarySession.Callback {
-        override fun onGetLibraryRoot(
-            session: MediaLibrarySession,
-            browser: MediaSession.ControllerInfo,
-            params: LibraryParams?
-        ): ListenableFuture<LibraryResult<MediaItem>> {
-            val rootItem = MediaItem.Builder()
-                .setMediaId("root_library")
-                .setMediaMetadata(
-                    androidx.media3.common.MediaMetadata.Builder()
-                        .setIsBrowsable(true)
-                        .setIsPlayable(false)
-                        .setTitle("Library")
-                        .build()
-                )
-                .build()
-            return Futures.immediateFuture(LibraryResult.ofItem(rootItem, params))
-        }
-
-        override fun onAddMediaItems(
-            mediaSession: MediaSession,
-            controller: MediaSession.ControllerInfo,
-            mediaItems: MutableList<MediaItem>
-        ): ListenableFuture<MutableList<MediaItem>> {
-            return Futures.immediateFuture(mediaItems)
-        }
     }
 }

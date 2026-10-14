@@ -46,7 +46,7 @@ import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import com.apple.auramusic.core.design.HardwareArtworkImage
 import com.apple.auramusic.core.design.ContinuousRoundedCornerShape
 import com.apple.auramusic.core.design.IosTypography
 import com.apple.auramusic.core.design.iosPressEffect
@@ -176,8 +176,8 @@ fun FloatingMiniPlayerCapsule(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Squircle Album Art Thumbnail
-        AsyncImage(
-            model = track.artworkUri,
+        HardwareArtworkImage(
+            artworkUri = track.artworkUri,
             contentDescription = track.album,
             modifier = Modifier
                 .size(44.dp)

@@ -43,7 +43,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import com.apple.auramusic.core.design.HardwareArtworkImage
 import com.apple.auramusic.core.design.ContinuousRoundedCornerShape
 import com.apple.auramusic.core.design.IosTypography
 import com.apple.auramusic.core.design.iosPressEffect
@@ -231,8 +231,8 @@ fun NowPlayingSheet(
                             .clip(artSquircle)
                             .border(0.75.dp, Color.White.copy(alpha = 0.24f), artSquircle)
                     ) {
-                        AsyncImage(
-                            model = track.artworkUri,
+                        HardwareArtworkImage(
+                            artworkUri = track.artworkUri,
                             contentDescription = track.title,
                             modifier = Modifier.fillMaxSize()
                         )
