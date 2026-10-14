@@ -2,6 +2,7 @@ package com.apple.auramusic.ui.nowplaying
 
 import android.view.RoundedCorner
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -78,7 +79,7 @@ fun rememberHardwareBezelCornerRadius(): Dp {
 
 @Composable
 fun NowPlayingSheet(
-    expansionFraction: Animatable<Float, *>,
+    expansionFraction: Animatable<Float, AnimationVector1D>,
     track: TrackEntity,
     palette: ArtworkMeshPalette,
     bassEnergy: Float,
@@ -132,7 +133,7 @@ fun NowPlayingSheet(
                     onDragStart = { velocityTracker.resetTracking() },
                     onDragEnd = {
                         val velocityY = velocityTracker.calculateVelocity().y
-                        val normalizedVelocity = -velocityY / size.height.coerceAtLeast(1)
+                        val normalizedVelocity = -velocityY / size.height.coerceAtLeast(1).toFloat()
                         val shouldExpand = if (kotlin.math.abs(velocityY) > 650f) {
                             velocityY < 0f
                         } else {
@@ -150,7 +151,7 @@ fun NowPlayingSheet(
                     onVerticalDrag = { change, dragAmount ->
                         change.consume()
                         velocityTracker.addPosition(change.uptimeMillis, change.position)
-                        val deltaFraction = -dragAmount / size.height.coerceAtLeast(1).toFloat()
+                        val deltaFraction = -dragAmount / size.height.coerceAtLeast(1).toFloat().toFloat()
                         scope.launch {
                             expansionFraction.snapTo(
                                 (expansionFraction.value + deltaFraction).coerceIn(0f, 1f)
