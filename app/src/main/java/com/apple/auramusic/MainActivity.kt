@@ -92,7 +92,6 @@ class MainActivity : ComponentActivity() {
         window.attributes = window.attributes.apply {
             preferredDisplayModeId = highestRateMode.modeId
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                frameRateBoostOnTouchEnabled = true
             }
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
