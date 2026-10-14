@@ -32,7 +32,7 @@ jobs:
           curl -sL https://services.gradle.org/distributions/gradle-8.10.2-bin.zip -o /tmp/gradle.zip
           unzip -q -o /tmp/gradle.zip -d /tmp
           if ! /tmp/gradle-8.10.2/bin/gradle assembleDebug --no-daemon > /tmp/gradle_build.log 2>&1; then
-            echo "========== KOTLIN / GRADLE ERRORS =========="
+            echo "========== GRADLE FAILURE SUMMARY =========="
             grep -E "^e: |Unresolved reference|Type mismatch|prohibits the use|What went wrong|Execution failed for task|Caused by:" -A 4 /tmp/gradle_build.log || tail -n 60 /tmp/gradle_build.log
             exit 1
           fi

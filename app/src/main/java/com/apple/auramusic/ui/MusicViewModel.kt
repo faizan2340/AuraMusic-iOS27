@@ -12,8 +12,10 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.apple.auramusic.audio.BassAmplitudeBufferSink
 import com.apple.auramusic.audio.MusicPlaybackService
+import com.apple.auramusic.core.design.ArtworkBitmapCache
 import com.apple.auramusic.core.graphics.ArtworkMeshPalette
 import com.apple.auramusic.core.graphics.GyroSpecularSensorManager
+import com.apple.auramusic.core.graphics.extractArtworkMeshPalette
 import com.apple.auramusic.core.physics.IosHapticsController
 import com.apple.auramusic.data.indexer.LocalAudioIndexer
 import com.apple.auramusic.data.local.TrackDao
@@ -27,10 +29,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+
+enum class LibraryFilter(val label: String) {
+    ALL("All Songs"),
+    LOSSLESS("Lossless"),
+    FAVORITES("Favorites ♥"),
+    FULL_LENGTH("2m+ Songs")
+}
+
+data class AlbumGroup(
+    val albumName: String,
+    val artistName: String,
+    val artworkUri: String,
+    val tracks: List<TrackEntity>
+)
 
 class MusicViewModel(
     private val context: Context,
@@ -47,27 +64,100 @@ class MusicViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    private val _selectedFilter = MutableStateFlow(LibraryFilter.ALL)
+    val selectedFilter: StateFlow<LibraryFilter> = _selectedFilter.asStateFlow()
+
+    private val _hideCallRecordings = MutableStateFlow(true)
+    val hideCallRecordings: StateFlow<Boolean> = _hideCallRecordings.asStateFlow()
+
+    private val _favoriteIds = MutableStateFlow<Set<Long>>(emptySet())
+    val favoriteIds: StateFlow<Set<Long>> = _favoriteIds.asStateFlow()
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    val libraryTracks: StateFlow<List<TrackEntity>> = _searchQuery
-        .flatMapLatest { query ->
-            if (query.isBlank()) {
-                trackDao.observeAllTracks()
-            } else {
-                trackDao.searchTracksInstant(query)
-            }
+    private val rawTracksFlow = _searchQuery.flatMapLatest { query ->
+        if (query.isBlank()) {
+            trackDao.observeAllTracks()
+        } else {
+            trackDao.searchTracksInstant(query)
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }
+
+    val libraryTracks: StateFlow<List<TrackEntity>> = combine(
+        rawTracksFlow,
+        _selectedFilter,
+        _hideCallRecordings,
+        _favoriteIds
+    ) { tracks, filter, hideCalls, favs ->
+        tracks.filter { track ->
+            val isCallRecording = track.album.contains("Call Rec", ignoreCase = true) ||
+                track.title.contains("Call Rec", ignoreCase = true) ||
+                track.title.contains("CNC-", ignoreCase = true) ||
+                track.filePath.contains("/Call", ignoreCase = true) ||
+                track.filePath.contains("/Recordings", ignoreCase = true)
+
+            val callPass = if (hideCalls) !isCallRecording else true
+            val filterPass = when (filter) {
+                LibraryFilter.ALL -> true
+                LibraryFilter.LOSSLESS -> track.audioBadge.contains("Lossless", ignoreCase = true)
+                LibraryFilter.FAVORITES -> favs.contains(track.id)
+                LibraryFilter.FULL_LENGTH -> track.durationMs >= 110_000L
+            }
+            callPass && filterPass
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val albumsList: StateFlow<List<AlbumGroup>> = combine(
+        trackDao.observeAllTracks(),
+        _hideCallRecordings
+    ) { tracks, hideCalls ->
+        tracks
+            .filter { track ->
+                if (!hideCalls) true
+                else !(track.album.contains("Call Rec", ignoreCase = true) ||
+                    track.title.contains("CNC-", ignoreCase = true))
+            }
+            .groupBy { it.album }
+            .map { (albumName, albumTracks) ->
+                val first = albumTracks.first()
+                AlbumGroup(
+                    albumName = albumName,
+                    artistName = first.artist,
+                    artworkUri = first.artworkUri,
+                    tracks = albumTracks
+                )
+            }
+            .sortedBy { it.albumName.lowercase() }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _currentTrack = MutableStateFlow<TrackEntity?>(null)
     val currentTrack: StateFlow<TrackEntity?> = _currentTrack.asStateFlow()
 
+    private val _activeQueue = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val activeQueue: StateFlow<List<TrackEntity>> = _activeQueue.asStateFlow()
+
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+
+    private val _isShuffleEnabled = MutableStateFlow(false)
+    val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled.asStateFlow()
+
+    private val _repeatMode = MutableStateFlow(0) // 0 = Off, 1 = All, 2 = One
+    val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
+
+    private val _playbackSpeed = MutableStateFlow(1.0f)
+    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
+
+    // 5-Band Parametric EQ Gains in [0.0f .. 1.0f] where 0.5f = 0dB flat
+    private val _eqBands = MutableStateFlow(listOf(0.58f, 0.54f, 0.50f, 0.55f, 0.60f))
+    val eqBands: StateFlow<List<Float>> = _eqBands.asStateFlow()
+
+    private val _selectedEqPreset = MutableStateFlow("Hi-Res Direct")
+    val selectedEqPreset: StateFlow<String> = _selectedEqPreset.asStateFlow()
 
     private val _currentPositionMs = MutableStateFlow(0L)
     val currentPositionMs: StateFlow<Long> = _currentPositionMs.asStateFlow()
 
-    private val _volumeFraction = MutableStateFlow(0.75f)
+    private val _volumeFraction = MutableStateFlow(0.78f)
     val volumeFraction: StateFlow<Float> = _volumeFraction.asStateFlow()
 
     private val _frostFactor = MutableStateFlow(0.28f)
@@ -93,11 +183,83 @@ class MusicViewModel(
     fun refreshLocalLibrary() {
         viewModelScope.launch {
             localAudioIndexer.indexLocalLibrary()
+            val tracks = libraryTracks.value
+            if (_currentTrack.value == null && tracks.isNotEmpty()) {
+                val first = tracks.first()
+                _currentTrack.value = first
+                _activeQueue.value = tracks
+                updatePaletteAndLyrics(first)
+            }
         }
     }
 
     fun onSearchQueryChange(newQuery: String) {
         _searchQuery.value = newQuery
+    }
+
+    fun setLibraryFilter(filter: LibraryFilter) {
+        _selectedFilter.value = filter
+        hapticsController.onGlassSnapConfirmation()
+    }
+
+    fun toggleHideCallRecordings() {
+        _hideCallRecordings.value = !_hideCallRecordings.value
+        hapticsController.onGlassSnapConfirmation()
+    }
+
+    fun toggleFavorite(trackId: Long) {
+        val current = _favoriteIds.value.toMutableSet()
+        if (!current.add(trackId)) {
+            current.remove(trackId)
+        }
+        _favoriteIds.value = current
+        hapticsController.onGlassSnapConfirmation()
+    }
+
+    fun toggleShuffle() {
+        val next = !_isShuffleEnabled.value
+        _isShuffleEnabled.value = next
+        mediaController?.shuffleModeEnabled = next
+        hapticsController.onGlassSnapConfirmation()
+    }
+
+    fun cycleRepeatMode() {
+        val next = (_repeatMode.value + 1) % 3
+        _repeatMode.value = next
+        mediaController?.repeatMode = when (next) {
+            1 -> Player.REPEAT_MODE_ALL
+            2 -> Player.REPEAT_MODE_ONE
+            else -> Player.REPEAT_MODE_OFF
+        }
+        hapticsController.onGlassSnapConfirmation()
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        val clamped = speed.coerceIn(0.5f, 2.0f)
+        _playbackSpeed.value = clamped
+        mediaController?.setPlaybackSpeed(clamped)
+        hapticsController.onGlassSnapConfirmation()
+    }
+
+    fun setEqBand(index: Int, value: Float) {
+        val list = _eqBands.value.toMutableList()
+        if (index in list.indices) {
+            list[index] = value.coerceIn(0f, 1f)
+            _eqBands.value = list
+            _selectedEqPreset.value = "Custom Studio"
+        }
+    }
+
+    fun applyEqPreset(presetName: String) {
+        _selectedEqPreset.value = presetName
+        _eqBands.value = when (presetName) {
+            "Flat Reference" -> listOf(0.50f, 0.50f, 0.50f, 0.50f, 0.50f)
+            "Sub-Bass Boost" -> listOf(0.82f, 0.72f, 0.48f, 0.54f, 0.62f)
+            "Vocal Presence" -> listOf(0.45f, 0.48f, 0.68f, 0.74f, 0.58f)
+            "Late Night" -> listOf(0.64f, 0.58f, 0.46f, 0.44f, 0.52f)
+            else -> listOf(0.58f, 0.54f, 0.50f, 0.55f, 0.60f)
+        }
+        hapticsController.onGlassSnapConfirmation()
     }
 
     fun setFrostFactor(value: Float) {
@@ -109,10 +271,11 @@ class MusicViewModel(
     }
 
     fun playTrack(track: TrackEntity, queue: List<TrackEntity>) {
+        val effectiveQueue = queue.ifEmpty { listOf(track) }
         _currentTrack.value = track
-        viewModelScope.launch {
-            _syncedLyrics.value = lyricsParser.loadLyricsForTrack(track)
-        }
+        _activeQueue.value = effectiveQueue
+        updatePaletteAndLyrics(track)
+
         if (track.uri.isBlank()) {
             _isPlaying.value = true
             _currentPositionMs.value = 0L
@@ -122,7 +285,8 @@ class MusicViewModel(
             _isPlaying.value = true
             return
         }
-        val items = queue.filter { it.uri.isNotBlank() }.map { item ->
+        val validQueue = effectiveQueue.filter { it.uri.isNotBlank() }
+        val items = validQueue.map { item ->
             MediaItem.Builder()
                 .setMediaId(item.id.toString())
                 .setUri(item.uri)
@@ -135,15 +299,41 @@ class MusicViewModel(
                 )
                 .build()
         }
-        val startIndex = queue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+        val startIndex = validQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
         controller.setMediaItems(items, startIndex, 0L)
         controller.prepare()
         controller.play()
     }
 
+    fun shufflePlayQueue(queue: List<TrackEntity>) {
+        if (queue.isEmpty()) return
+        val shuffled = queue.shuffled()
+        _isShuffleEnabled.value = true
+        mediaController?.shuffleModeEnabled = true
+        playTrack(shuffled.first(), shuffled)
+        hapticsController.onGlassSnapConfirmation()
+    }
+
+    private fun updatePaletteAndLyrics(track: TrackEntity) {
+        viewModelScope.launch {
+            _syncedLyrics.value = lyricsParser.loadLyricsForTrack(track)
+        }
+        viewModelScope.launch {
+            val bmp = ArtworkBitmapCache.loadArtworkBitmap(context, track.artworkUri)
+            _artworkPalette.value = extractArtworkMeshPalette(bmp)
+        }
+    }
+
     fun togglePlayPause() {
         val current = _currentTrack.value
-        if (current != null && current.uri.isBlank()) {
+        if (current == null) {
+            val all = libraryTracks.value
+            if (all.isNotEmpty()) {
+                playTrack(all.first(), all)
+            }
+            return
+        }
+        if (current.uri.isBlank()) {
             _isPlaying.value = !_isPlaying.value
             return
         }
@@ -155,11 +345,33 @@ class MusicViewModel(
     }
 
     fun skipNext() {
-        mediaController?.seekToNextMediaItem()
+        val controller = mediaController
+        if (controller != null && controller.hasNextMediaItem()) {
+            controller.seekToNextMediaItem()
+        } else {
+            val q = _activeQueue.value
+            val cur = _currentTrack.value
+            if (q.isNotEmpty() && cur != null) {
+                val idx = q.indexOfFirst { it.id == cur.id }
+                val nextTrack = q[(idx + 1) % q.size]
+                playTrack(nextTrack, q)
+            }
+        }
     }
 
     fun skipPrevious() {
-        mediaController?.seekToPreviousMediaItem()
+        val controller = mediaController
+        if (controller != null && controller.hasPreviousMediaItem()) {
+            controller.seekToPreviousMediaItem()
+        } else {
+            val q = _activeQueue.value
+            val cur = _currentTrack.value
+            if (q.isNotEmpty() && cur != null) {
+                val idx = q.indexOfFirst { it.id == cur.id }.coerceAtLeast(0)
+                val prevTrack = q[(idx - 1 + q.size) % q.size]
+                playTrack(prevTrack, q)
+            }
+        }
     }
 
     fun seekToFraction(fraction: Float) {
@@ -198,7 +410,7 @@ class MusicViewModel(
                     viewModelScope.launch {
                         val entity = trackDao.getTrackById(id) ?: return@launch
                         _currentTrack.value = entity
-                        _syncedLyrics.value = lyricsParser.loadLyricsForTrack(entity)
+                        updatePaletteAndLyrics(entity)
                     }
                 }
             })
